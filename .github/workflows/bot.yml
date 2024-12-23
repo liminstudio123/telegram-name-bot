@@ -21,9 +21,21 @@ jobs:
       run: |
         python -m pip install --upgrade pip
         pip install -r requirements.txt
+        pip list
+    
+    - name: Check environment
+      run: |
+        echo "Python version:"
+        python --version
+        echo "Current directory:"
+        pwd
+        echo "Directory contents:"
+        ls -la
+        echo "Bot token length:"
+        python -c "import os; token = os.getenv('BOT_TOKEN', ''); print(f'Token length: {len(token)}')"
     
     - name: Run bot
       run: |
-        python telegram_name_monitor_bot.py
+        python -u telegram_name_monitor_bot.py
       env:
-        BOT_TOKEN: ${{ secrets.BOT_TOKEN }} 
+        BOT_TOKEN: ${{ secrets.BOT_TOKEN }}

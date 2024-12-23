@@ -3,22 +3,33 @@ from telegram.ext import Application, ContextTypes, ChatMemberHandler, CommandHa
 import os
 import asyncio
 import logging
+import sys
 
 # 设置日志
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    level=logging.INFO
+    level=logging.DEBUG,  # 改为 DEBUG 级别
+    stream=sys.stdout  # 确保日志输出到 stdout
 )
 logger = logging.getLogger(__name__)
 
 # 从环境变量获取 bot token
-BOT_TOKEN = os.getenv("BOT_TOKEN", "8083024089:AAFM9bktsdkeUQvKMRYwtp-oXXIP4UqHt-Q")
-logger.info(f"Using BOT_TOKEN: {BOT_TOKEN[:10]}...")
+BOT_TOKEN = os.getenv("BOT_TOKEN")
+if not BOT_TOKEN:
+    logger.error("No BOT_TOKEN provided in environment variables!")
+    sys.exit(1)
+logger.info(f"Bot token length: {len(BOT_TOKEN)}")
 
+async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """处理错误"""
+    logger.error("Exception while handling an update:", exc_info=context.error)
+    
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """处理 /start 命令"""
     try:
+        logger.debug("Received /start command")
         user = update.effective_user
+        logger.info(f"Processing /start command from user {user.id}")
         welcome_message = (
             f"👋 你好 {user.first_name}!\n\n"
             "我是名字变更监控机器人。\n"
@@ -28,6 +39,11 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         logger.info(f"Sent welcome message to user {user.id}")
     except Exception as e:
         logger.error(f"Error in start_command: {str(e)}", exc_info=True)
+        # 尝试发送错误消息
+        try:
+            await update.message.reply_text("抱歉，处理命令时出现错误。")
+        except:
+            pass
 
 async def track_chat_member_updates(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """处理群组成员信息更新"""
@@ -71,28 +87,32 @@ async def main() -> None:
     """启动机器人"""
     try:
         # 创建应用
+        logger.info("Creating application...")
         application = Application.builder().token(BOT_TOKEN).build()
         logger.info("Application created successfully")
 
         # 添加处理程序
         application.add_handler(CommandHandler("start", start_command))
         application.add_handler(ChatMemberHandler(track_chat_member_updates))
-        logger.info("Handlers added successfully")
+        application.add_error_handler(error_handler)
+        logger.info("All handlers added successfully")
 
         # 启动机器人
         logger.info("Starting bot...")
-        await application.run_polling(allowed_updates=["chat_member", "message"])
+        await application.run_polling(
+            allowed_updates=["chat_member", "message"],
+            drop_pending_updates=True
+        )
     except Exception as e:
         logger.error(f"Error in main: {str(e)}", exc_info=True)
+        sys.exit(1)
 
 if __name__ == "__main__":
     try:
         logger.info("Bot script started")
         asyncio.run(main())
-    except RuntimeError as e:
-        if "already running" in str(e):
-            logger.info("Event loop already running, using existing loop")
-            loop = asyncio.get_event_loop()
-            loop.run_until_complete(main())
+    except KeyboardInterrupt:
+        logger.info("Bot stopped by user")
     except Exception as e:
-        logger.error(f"Unexpected error: {str(e)}", exc_info=True) 
+        logger.error(f"Fatal error: {str(e)}", exc_info=True)
+        sys.exit(1) 
