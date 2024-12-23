@@ -1,5 +1,5 @@
 from telegram import Update
-from telegram.ext import Application, ContextTypes, ChatMemberHandler
+from telegram.ext import Application, ContextTypes, ChatMemberHandler, CommandHandler
 import os
 import asyncio
 import logging
@@ -14,6 +14,20 @@ logger = logging.getLogger(__name__)
 # 从环境变量获取 bot token
 BOT_TOKEN = os.getenv("BOT_TOKEN", "8083024089:AAFM9bktsdkeUQvKMRYwtp-oXXIP4UqHt-Q")
 logger.info(f"Using BOT_TOKEN: {BOT_TOKEN[:10]}...")
+
+async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """处理 /start 命令"""
+    try:
+        user = update.effective_user
+        welcome_message = (
+            f"👋 你好 {user.first_name}!\n\n"
+            "我是名字变更监控机器人。\n"
+            "请将我添加到群组并设置为管理员，我会监控群成员的名字变更。"
+        )
+        await update.message.reply_text(welcome_message)
+        logger.info(f"Sent welcome message to user {user.id}")
+    except Exception as e:
+        logger.error(f"Error in start_command: {str(e)}", exc_info=True)
 
 async def track_chat_member_updates(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """处理群组成员信息更新"""
@@ -61,12 +75,13 @@ async def main() -> None:
         logger.info("Application created successfully")
 
         # 添加处理程序
+        application.add_handler(CommandHandler("start", start_command))
         application.add_handler(ChatMemberHandler(track_chat_member_updates))
-        logger.info("Handler added successfully")
+        logger.info("Handlers added successfully")
 
         # 启动机器人
         logger.info("Starting bot...")
-        await application.run_polling(allowed_updates=["chat_member"])
+        await application.run_polling(allowed_updates=["chat_member", "message"])
     except Exception as e:
         logger.error(f"Error in main: {str(e)}", exc_info=True)
 
